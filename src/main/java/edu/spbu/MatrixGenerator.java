@@ -86,8 +86,8 @@ public class MatrixGenerator
 
   private String generateRow()
   {
-    return rnd.ints(0, emptyRowFraction).limit(size).mapToObj(r -> (r == 0) ? "" + rnd.nextInt(10000) : "0")
-            .collect(Collectors.joining(" "));
+    return /*rnd.ints(0, emptyRowFraction).limit(size).mapToObj(r -> (r == 0) ? "" + rnd.nextInt(10000) : "0")
+            .collect(Collectors.joining(" "))*/;
   }
 
 }
