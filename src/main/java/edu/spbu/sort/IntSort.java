@@ -9,17 +9,37 @@ import java.util.List;
  */
 public class IntSort {
   public static void sort (int array[]) {
-    Arrays.sort(array);
+    //Arrays.sort(array);
 
-    for(int i = 0; i < array.length; i++){
-      for(int j = 0; j < array.length - i - 1; j++){
-        if(array[i] > array[j]){
-          int tmp = array[i];
-          array[i] = array[j];
-          array[j] = tmp;
+    quickSort(array, 0, array.length - 1);
+  }
+
+  public static void quickSort (int array[], int leftBorder, int rightBorder){
+    int leftPointer = leftBorder;
+    int rightPointer = rightBorder;
+    int pivot = array[(leftBorder + rightBorder) / 2];
+
+    do{
+      while(array[leftPointer] < pivot)
+        leftPointer++;
+      while(array[rightPointer] > pivot)
+        rightPointer--;
+
+      if(leftPointer <= rightPointer){
+        if(array[leftPointer] > array[rightPointer]){
+          int tmp = array[leftPointer];
+          array[leftPointer] = array[rightPointer];
+          array[rightPointer] = tmp;
         }
+        leftPointer++;
+        rightPointer--;
       }
-    }
+    }while(leftPointer <= rightPointer);
+
+    if(leftPointer < rightBorder)
+      quickSort(array, leftPointer, rightBorder);
+    if(rightPointer > leftBorder)
+      quickSort(array, leftBorder, rightPointer);
   }
 
   public static void sort (List<Integer> list) {
