@@ -11,7 +11,7 @@ public interface Matrix
    * @param o
    * @return
    */
-  Matrix mul(Matrix o);
+  Matrix mul(Matrix o) throws Exception;
 
   /**
    * многопоточное умножение матриц

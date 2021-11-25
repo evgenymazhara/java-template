@@ -5,6 +5,7 @@ package edu.spbu.matrix;
  */
 public class SparseMatrix implements Matrix
 {
+
   /**
    * загружает матрицу из файла
    * @param fileName

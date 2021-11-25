@@ -25,11 +25,11 @@ public class IntSort {
       while(array[rightPointer] > pivot)
         rightPointer--;
 
-      if(leftPointer <= rightPointer){
-        if(array[leftPointer] > array[rightPointer]){
-          int tmp = array[leftPointer];
-          array[leftPointer] = array[rightPointer];
-          array[rightPointer] = tmp;
+        if(leftPointer <= rightPointer) {
+          if(array[leftPointer] > array[rightPointer]) {
+            int tmp = array[leftPointer];
+            array[leftPointer] = array[rightPointer];
+            array[rightPointer] = tmp;
         }
         leftPointer++;
         rightPointer--;
