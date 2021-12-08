@@ -37,17 +37,19 @@ public class DenseMatrix implements Matrix
       try {
           Scanner scanner = new Scanner(new FileReader(fileName));
           if (!scanner.hasNextLine())
-              throw new Exception("Пустой файл");
+              throw new Exception("Пустой файл\n");
           ArrayList<double[]> matrixLines = new ArrayList<double[]>();
           String line = scanner.nextLine();
           double[] matrixLine = Arrays.stream(line.split(" ")).mapToDouble(Double::parseDouble).toArray();
           matrixLines.add(matrixLine);
+          this.width = matrixLine.length;
           while(scanner.hasNextLine()){
               line = scanner.nextLine();
               matrixLine = Arrays.stream(line.split(" ")).mapToDouble(Double::parseDouble).toArray();
+              if(matrixLine.length != this.width)
+                  throw new Exception("Разное количество элементов в строках матрицы\n");
               matrixLines.add(matrixLine);
           }
-          this.width = matrixLine.length;
           this.height = matrixLines.size();
           this.matr = new double[this.height][this.width];
           for(int i = 0; i < this.height; i++)
@@ -56,6 +58,24 @@ public class DenseMatrix implements Matrix
       catch (Exception exception){
           exception.printStackTrace();
       }
+  }
+
+  public SparseMatrix denseToSparse(){
+      ArrayList<Double> res_nZV = new ArrayList<Double>();
+      ArrayList<Integer> res_cI = new ArrayList<Integer>();
+      ArrayList<Integer> res_rI = new ArrayList<Integer>();
+
+      for(int i = 0; i < this.height; i++){
+          for(int j = 0; j < this.width; j++){
+              if(this.matr[i][j] != 0){
+                  res_nZV.add(this.matr[i][j]);
+                  res_cI.add(j);
+              }
+          }
+          res_rI.add(res_nZV.size());
+      }
+      SparseMatrix res = new SparseMatrix(this.height, this.width, res_nZV, res_cI, res_rI);
+      return res;
   }
   /**
    * однопоточное умнджение матриц
@@ -77,13 +97,44 @@ public class DenseMatrix implements Matrix
       }
       return result;
   }
+
+  private SparseMatrix mul(SparseMatrix o) throws Exception{
+      if(this.width != o.height)
+          throw new Exception("Матрицы не могут быть умножены: несовпадение размеров");
+      SparseMatrix o_tr = o.CRS_transposition();
+      ArrayList<Double> res_nZV = new ArrayList<Double>();
+      ArrayList<Integer> res_cI = new ArrayList<Integer>();
+      ArrayList<Integer> res_rI = new ArrayList<Integer>();
+      res_rI.add(0);
+
+      for(int i = 0; i < this.height; i++) {
+          for (int j = 0; j < o_tr.height; j++) {
+              double scalarProduct = 0;
+              for(int k = o_tr.rowsIndexation.get(i); k < o_tr.rowsIndexation.get(i+1); k++){
+                  scalarProduct += o_tr.notZeroValues.get(k) * this.matr[i][o_tr.colsIndex.get(k)];
+              }
+              if(scalarProduct != 0){
+                  res_nZV.add(scalarProduct);
+                  res_cI.add(j);
+              }
+          }
+          res_rI.add(res_nZV.size());
+      }
+
+      SparseMatrix res = new SparseMatrix(this.height, o.width, res_nZV, res_cI, res_rI);
+      return res;
+  }
+
   @Override public Matrix mul(Matrix o) throws Exception
   {
       if(o instanceof DenseMatrix){
           return this.mul((DenseMatrix) o);
       }
+      else if(o instanceof SparseMatrix){
+          return this.mul((SparseMatrix) o);
+      }
       else
-          return null;
+          return this.mul((SparseMatrix) o);
   }
 
   /**
@@ -114,6 +165,9 @@ public class DenseMatrix implements Matrix
   @Override public boolean equals(Object o) {
       if(o instanceof DenseMatrix) {
           return this.equals((DenseMatrix) o);
+      }
+      else if(o instanceof SparseMatrix){
+          return this.denseToSparse().equals((SparseMatrix) o);
       }
       else
           return false;
