@@ -37,4 +37,12 @@ public class MatrixTest
     Matrix expected = new SparseMatrix("C:\\Users\\Евгений\\IdeaProjects\\java-template\\src\\test\\java\\edu\\spbu\\matrix\\result34.txt");
     assertEquals(expected, m1.mul(m2));
   }
+
+  @Test
+  public void dmulDD() throws Exception{
+    Matrix m1 = new DenseMatrix("C:\\Users\\Евгений\\IdeaProjects\\java-template\\src\\test\\java\\edu\\spbu\\matrix\\m1.txt");
+    Matrix m2 = new DenseMatrix("C:\\Users\\Евгений\\IdeaProjects\\java-template\\src\\test\\java\\edu\\spbu\\matrix\\m2.txt");
+    Matrix expected = new DenseMatrix("C:\\Users\\Евгений\\IdeaProjects\\java-template\\src\\test\\java\\edu\\spbu\\matrix\\result12.txt");
+    assertEquals(expected, m1.dmul(m2));
+  }
 }

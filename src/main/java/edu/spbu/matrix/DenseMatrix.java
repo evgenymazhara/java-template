@@ -4,6 +4,9 @@ import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Scanner;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * Плотная матрица
@@ -110,7 +113,7 @@ public class DenseMatrix implements Matrix
       for(int i = 0; i < this.height; i++) {
           for (int j = 0; j < o_tr.height; j++) {
               double scalarProduct = 0;
-              for(int k = o_tr.rowsIndexation.get(i); k < o_tr.rowsIndexation.get(i+1); k++){
+              for(int k = o_tr.rowsIndexation.get(j); k < o_tr.rowsIndexation.get(j+1); k++){
                   scalarProduct += o_tr.notZeroValues.get(k) * this.matr[i][o_tr.colsIndex.get(k)];
               }
               if(scalarProduct != 0){
@@ -134,7 +137,7 @@ public class DenseMatrix implements Matrix
           return this.mul((SparseMatrix) o);
       }
       else
-          return this.mul((SparseMatrix) o);
+          return null;
   }
 
   /**
@@ -143,9 +146,37 @@ public class DenseMatrix implements Matrix
    * @param o
    * @return
    */
-  @Override public Matrix dmul(Matrix o)
+  private DenseMatrix dmul(DenseMatrix o) throws Exception{
+      if(this.width != o.height)
+          throw new Exception("Матрицы не могут быть умножены: несовпадение размеров");
+      double[][] resMatr = new double[this.height][o.width];
+      ExecutorService service = Executors.newWorkStealingPool();
+      ArrayList<Future> futureTasks = new ArrayList<>();
+
+      for(int i = 0; i < this.height; i++){
+          final int i1 = i;
+          futureTasks.add(service.submit(()->{
+              for(int j = 0; j < o.width; j++){
+                  resMatr[i1][j] = 0;
+                  for(int k = 0; k < this.width; k++){
+                      resMatr[i1][j] += this.matr[i1][k] * o.matr[k][j];
+                  }
+              }
+          }));
+      }
+      for(Future task: futureTasks){
+          task.get();
+      }
+      service.shutdown();
+      return new DenseMatrix(resMatr);
+  }
+
+  @Override public Matrix dmul(Matrix o) throws Exception
   {
-    return null;
+      if(o instanceof DenseMatrix){
+          return this.dmul((DenseMatrix) o);
+      }
+      return null;
   }
 
   private boolean equals(DenseMatrix o){

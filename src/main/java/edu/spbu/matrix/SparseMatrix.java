@@ -2,13 +2,13 @@ package edu.spbu.matrix;
 
 import java.io.FileReader;
 import java.util.ArrayList;
-import java.util.NoSuchElementException;
+import java.util.Arrays;
 import java.util.Scanner;
 
 /**
- * Разряженная матрица
+ * Разреженная матрица
  */
-public class SparseMatrix implements Matrix // хранение матрицы в виде CSR
+public class SparseMatrix implements Matrix // хранение матрицы в виде представления CSR
 {
   public int height;
   public int width;
@@ -32,9 +32,9 @@ public class SparseMatrix implements Matrix // хранение матрицы �
       Scanner scanner = new Scanner(new FileReader(fileName));
       if (!scanner.hasNextLine())
         throw new Exception("Пустой файл\n");
-      this.notZeroValues = new ArrayList<Double>();
-      this.colsIndex = new ArrayList<Integer>();
-      this.rowsIndexation = new ArrayList<Integer>();
+      this.notZeroValues = new ArrayList<>();
+      this.colsIndex = new ArrayList<>();
+      this.rowsIndexation = new ArrayList<>();
       this.width = 1;
       this.height = 1;
 
@@ -53,14 +53,17 @@ public class SparseMatrix implements Matrix // хранение матрицы �
       this.rowsIndexation.add(0); // первый элемент этого массива всегда 0
       double current;
       for(int i = 0; i < this.height; i++){
+        String currentLine = scanner.nextLine();
+        Scanner scanner1 = new Scanner(currentLine);
         for(int j = 0; j < this.width; j++){
-          current = scanner.nextDouble();
+          //current = scanner.nextDouble();
+          current = scanner1.nextDouble();
           if(current != 0){
             this.notZeroValues.add(current);
             this.colsIndex.add(j);
           }
         }
-        if(scanner.hasNextDouble())
+        if(scanner1.hasNextDouble())
           throw new Exception("Некорректный файл: несоответствие элементов в строках");
         this.rowsIndexation.add(notZeroValues.size());
       }
@@ -75,15 +78,15 @@ public class SparseMatrix implements Matrix // хранение матрицы �
   public SparseMatrix CRS_transposition(){
     int t_height = this.width;
     int t_width = this.height;
-    ArrayList<Double> t_nZV = new ArrayList<Double>(this.notZeroValues.size());
-    ArrayList<Integer> t_cI = new ArrayList<Integer>(this.colsIndex.size());
-    ArrayList<Integer> t_rI = new ArrayList<Integer>(t_height+1);
+    ArrayList<Double> t_nZV = new ArrayList<>(this.notZeroValues.size());
+    ArrayList<Integer> t_cI = new ArrayList<>(this.colsIndex.size());
+    ArrayList<Integer> t_rI = new ArrayList<>(t_height+1);
 
     ArrayList<ArrayList<Double>> doubleVectors = new ArrayList<>(this.width);
     ArrayList<ArrayList<Integer>> intVectors = new ArrayList<>(this.width);
     for(int i = 0; i < this.width; i++){
-      doubleVectors.add(new ArrayList<Double>());
-      intVectors.add(new ArrayList<Integer>());
+      doubleVectors.add(new ArrayList<>());
+      intVectors.add(new ArrayList<>());
     }
     int index = 0;
     for(int i = 0; i < this.height; i++){
@@ -100,12 +103,11 @@ public class SparseMatrix implements Matrix // хранение матрицы �
       t_rI.add(t_rI.get(i) + doubleVectors.get(i).size());
     }
 
-    SparseMatrix t = new SparseMatrix(t_height,t_width,t_nZV,t_cI,t_rI);
-    return t;
+    return new SparseMatrix(t_height,t_width,t_nZV,t_cI,t_rI);
   }
 
   /**
-   * однопоточное умнджение матриц
+   * однопоточное умножение матриц
    * должно поддерживаться для всех 4-х вариантов
    *
    * @param o
@@ -115,9 +117,9 @@ public class SparseMatrix implements Matrix // хранение матрицы �
     if(this.width != o.height)
       throw new Exception("Матрицы не могут быть умножены: несовпадение размеров");
     SparseMatrix o_tr = o.CRS_transposition();
-    ArrayList<Double> res_nZV = new ArrayList<Double>();
-    ArrayList<Integer> res_cI = new ArrayList<Integer>();
-    ArrayList<Integer> res_rI = new ArrayList<Integer>();
+    ArrayList<Double> res_nZV = new ArrayList<>();
+    ArrayList<Integer> res_cI = new ArrayList<>();
+    ArrayList<Integer> res_rI = new ArrayList<>();
     res_rI.add(0);
 
     for(int i = 0; i < this.height; i++){
@@ -142,16 +144,15 @@ public class SparseMatrix implements Matrix // хранение матрицы �
       res_rI.add(res_nZV.size());
     }
 
-    SparseMatrix res = new SparseMatrix(this.height, o.width, res_nZV, res_cI, res_rI);
-    return res;
+    return new SparseMatrix(this.height, o.width, res_nZV, res_cI, res_rI);
   }
 
   private SparseMatrix mul(DenseMatrix o) throws Exception{
     if(this.width != o.height)
       throw new Exception("Матрицы не могут быть умножены: несовпадение размеров");
-    ArrayList<Double> res_nZV = new ArrayList<Double>();
-    ArrayList<Integer> res_cI = new ArrayList<Integer>();
-    ArrayList<Integer> res_rI = new ArrayList<Integer>();
+    ArrayList<Double> res_nZV = new ArrayList<>();
+    ArrayList<Integer> res_cI = new ArrayList<>();
+    ArrayList<Integer> res_rI = new ArrayList<>();
     res_rI.add(0);
 
     for(int i = 0; i < this.height; i++){
@@ -168,8 +169,7 @@ public class SparseMatrix implements Matrix // хранение матрицы �
       res_rI.add(res_nZV.size());
     }
 
-    SparseMatrix res = new SparseMatrix(this.height, o.width, res_nZV, res_cI, res_rI);
-    return res;
+    return new SparseMatrix(this.height, o.width, res_nZV, res_cI, res_rI);
   }
 
   @Override public Matrix mul(Matrix o) throws Exception
@@ -192,7 +192,7 @@ public class SparseMatrix implements Matrix // хранение матрицы �
   }
 
   /**
-   * спавнивает с обоими вариантами
+   * сравнивает с обоими вариантами
    * @param o
    * @return
    */
@@ -205,9 +205,7 @@ public class SparseMatrix implements Matrix // хранение матрицы �
       return false;
     if(!(this.colsIndex.equals(o.colsIndex)))
       return false;
-    if(!(this.rowsIndexation.equals(o.rowsIndexation)))
-      return false;
-    return true;
+    return this.rowsIndexation.equals(o.rowsIndexation);
   }
 
   @Override public boolean equals(Object o) {
@@ -239,10 +237,10 @@ public class SparseMatrix implements Matrix // хранение матрицы �
   }
 
   public int hashCode() {
-    int result = this.notZeroValues.toArray().hashCode();
+    int result = Arrays.hashCode(this.notZeroValues.toArray());
     result += this.height;
     result *= 31;
-    result += this.colsIndex.toArray().hashCode();
+    result += Arrays.hashCode(this.colsIndex.toArray());
     return result;
   }
 }
