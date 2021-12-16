@@ -14,7 +14,6 @@ public class Client {
         socket.getOutputStream().write(req.getBytes());
         socket.getOutputStream().flush();
         Scanner scanner = new Scanner(socket.getInputStream());
-        //System.out.println(scanner.hasNextLine());
         while(scanner.hasNextLine()){
             System.out.print(scanner.nextLine());
         }
