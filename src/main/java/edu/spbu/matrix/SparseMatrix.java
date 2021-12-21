@@ -1,9 +1,14 @@
 package edu.spbu.matrix;
 
 import java.io.FileReader;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Scanner;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * Разреженная матрица
@@ -43,6 +48,7 @@ public class SparseMatrix implements Matrix // хранение матрицы �
         if (firstLine.charAt(i) == ' ')
           this.width++;
       }
+      //this.width--;
       while(scanner.hasNextLine()){
         scanner.nextLine();
         this.height++;
@@ -50,21 +56,17 @@ public class SparseMatrix implements Matrix // хранение матрицы �
 
       scanner.reset();
       scanner = new Scanner(new FileReader(fileName));
+      scanner = scanner.useLocale(Locale.ENGLISH);
       this.rowsIndexation.add(0); // первый элемент этого массива всегда 0
-      double current;
+      double current = 0;
       for(int i = 0; i < this.height; i++){
-        String currentLine = scanner.nextLine();
-        Scanner scanner1 = new Scanner(currentLine);
         for(int j = 0; j < this.width; j++){
-          //current = scanner.nextDouble();
-          current = scanner1.nextDouble();
+          current = scanner.nextDouble();
           if(current != 0){
             this.notZeroValues.add(current);
             this.colsIndex.add(j);
           }
         }
-        if(scanner1.hasNextDouble())
-          throw new Exception("Некорректный файл: несоответствие элементов в строках");
         this.rowsIndexation.add(notZeroValues.size());
       }
     }
@@ -123,15 +125,15 @@ public class SparseMatrix implements Matrix // хранение матрицы �
     res_rI.add(0);
 
     for(int i = 0; i < this.height; i++){
+      int[] x = new int[this.width]; // массив с индексами ненулевых элементов строки первой матрицы, они имеют индексы равные номеру своего столбца
+      for(int k = 0; k < this.width; k++)
+        x[k] = -1;
+      for(int k = this.rowsIndexation.get(i); k < this.rowsIndexation.get(i+1); k++)
+        x[this.colsIndex.get(k)] = k;
       for(int j = 0; j < o_tr.height; j++){
         // умножение i-й строки первой матрицы на j-й столбец второй (или на j-ю строчку транспонированной второй)
         // фактически операция внутри этих циклов заключается в скалярном умножении двух разреженных векторов
-        int[] x = new int[this.width]; // массив с индексами ненулевых элементов строки первой матрицы, они имеют индексы равные номеру своего столбца
         double scalarProduct = 0;
-        for(int k = 0; k < this.width; k++)
-          x[k] = -1;
-        for(int k = this.rowsIndexation.get(i); k < this.rowsIndexation.get(i+1); k++)
-          x[this.colsIndex.get(k)] = k;
         for(int k = o_tr.rowsIndexation.get(j); k < o_tr.rowsIndexation.get(j+1); k++){
           if(x[o_tr.colsIndex.get(k)] != -1)
             scalarProduct += this.notZeroValues.get(x[o_tr.colsIndex.get(k)]) * o_tr.notZeroValues.get(k);
@@ -176,8 +178,9 @@ public class SparseMatrix implements Matrix // хранение матрицы �
   {
     if(o instanceof SparseMatrix)
       return this.mul((SparseMatrix) o);
-    else
+    else if(o instanceof DenseMatrix)
       return this.mul((DenseMatrix) o);
+    return null;
   }
 
   /**
@@ -186,8 +189,104 @@ public class SparseMatrix implements Matrix // хранение матрицы �
    * @param o
    * @return
    */
-  @Override public Matrix dmul(Matrix o)
+  private SparseMatrix dmul(SparseMatrix o) throws Exception{
+    if(this.width != o.height)
+      throw new Exception("Matrices cannot be multiplied because of a size difference\n");
+
+    ExecutorService service = Executors.newWorkStealingPool();
+    Future[] futureTasks = new Future[this.height];
+    SparseMatrix[] submatrices = new SparseMatrix[this.height];
+    //for(int i = 0; i < this.height; i++) submatrices[i] = new DenseMatrix(1, this.width).denseToSparse();
+    //получение каждой строчки и ее умножение на вторую матрицу
+    for(int i = 0; i < this.height; i++){
+      final int i1 = i;
+      futureTasks[i1] = service.submit(()->{
+        ArrayList<Double> sub_nZV = new ArrayList<>();
+        ArrayList<Integer> sub_cI = new ArrayList<>();
+        ArrayList<Integer> sub_rI = new ArrayList<>(2);
+        //нужно из листов самой матрицы скопировать отрезки, находящиеся между индексами this.rowsIndexation.get(i1) и ...get(i1+1)
+        sub_rI.add(0);
+        sub_rI.add(this.rowsIndexation.get(i1 + 1) - this.rowsIndexation.get(i1));//количество ненулевых в сабматрице, поскольку она 1строчная
+        sub_nZV.addAll(this.notZeroValues.subList(this.rowsIndexation.get(i1), this.rowsIndexation.get(i1+1)));
+        sub_cI.addAll(this.colsIndex.subList(this.rowsIndexation.get(i1), this.rowsIndexation.get(i1+1)));
+        submatrices[i1] = new SparseMatrix(1, this.width, sub_nZV, sub_cI, sub_rI);
+        try {
+          submatrices[i1] = submatrices[i1].mul(o);
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+      });
+    }
+    for(Future task: futureTasks){
+      task.get();
+    }
+    service.shutdown();
+
+    //соединение матрицы воедино
+    ArrayList<Double> res_nZV = new ArrayList<>();
+    ArrayList<Integer> res_cI = new ArrayList<>();
+    ArrayList<Integer> res_rI = new ArrayList<>(this.height + 1);
+    res_rI.add(0);
+    for(int i = 0; i < this.height; i++){
+      res_nZV.addAll(submatrices[i].notZeroValues);
+      res_cI.addAll(submatrices[i].colsIndex);
+      res_rI.add(res_nZV.size());
+    }
+    return new SparseMatrix(this.height, o.width, res_nZV, res_cI, res_rI);
+  }
+
+  private SparseMatrix dmul(DenseMatrix o) throws Exception{
+    if(this.width != o.height)
+      throw new Exception("Matrices cannot be multiplied because of a size difference\n");
+
+    ExecutorService service = Executors.newWorkStealingPool();
+    Future[] futureTasks = new Future[this.height];
+    SparseMatrix[] submatrices = new SparseMatrix[this.height];
+    //for(int i = 0; i < this.height; i++) submatrices[i] = new DenseMatrix(1, this.width).denseToSparse();
+    //получение каждой строчки и ее умножение на вторую матрицу
+    for(int i = 0; i < this.height; i++){
+      final int i1 = i;
+      futureTasks[i1] = service.submit(()->{
+        ArrayList<Double> sub_nZV = new ArrayList<>();
+        ArrayList<Integer> sub_cI = new ArrayList<>();
+        ArrayList<Integer> sub_rI = new ArrayList<>(2);
+        //нужно из листов самой матрицы скопировать отрезки, находящиеся между индексами this.rowsIndexation.get(i1) и ...get(i1+1)
+        sub_rI.add(0);
+        sub_rI.add(this.rowsIndexation.get(i1 + 1) - this.rowsIndexation.get(i1));//количество ненулевых в сабматрице, поскольку она 1строчная
+        sub_nZV.addAll(this.notZeroValues.subList(this.rowsIndexation.get(i1), this.rowsIndexation.get(i1+1)));
+        sub_cI.addAll(this.colsIndex.subList(this.rowsIndexation.get(i1), this.rowsIndexation.get(i1+1)));
+        submatrices[i1] = new SparseMatrix(1, this.width, sub_nZV, sub_cI, sub_rI);
+        try {
+          submatrices[i1] = submatrices[i1].mul(o);
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+      });
+    }
+    for(Future task: futureTasks){
+      task.get();
+    }
+    service.shutdown();
+
+    //соединение матрицы воедино
+    ArrayList<Double> res_nZV = new ArrayList<>();
+    ArrayList<Integer> res_cI = new ArrayList<>();
+    ArrayList<Integer> res_rI = new ArrayList<>(this.height + 1);
+    res_rI.add(0);
+    for(int i = 0; i < this.height; i++){
+      res_nZV.addAll(submatrices[i].notZeroValues);
+      res_cI.addAll(submatrices[i].colsIndex);
+      res_rI.add(res_nZV.size());
+    }
+    return new SparseMatrix(this.height, o.width, res_nZV, res_cI, res_rI);
+  }
+
+  @Override public Matrix dmul(Matrix o) throws Exception
   {
+    if(o instanceof SparseMatrix)
+      return this.dmul((SparseMatrix) o);
+    if(o instanceof DenseMatrix)
+      return this.dmul((DenseMatrix) o);
     return null;
   }
 
@@ -225,12 +324,14 @@ public class SparseMatrix implements Matrix // хранение матрицы �
         if((index < k) && (this.colsIndex.get(index) == j)) {
           result = result.concat(Double.toString(this.notZeroValues.get(index)));
           result = result.concat(" ");
+          index++;
         }
         else {
           result = result.concat(Double.toString(0));
           result = result.concat(" ");
         }
       }
+      result = result.substring(0, result.length() - 1);
       result = result.concat("\n");
     }
     return result;

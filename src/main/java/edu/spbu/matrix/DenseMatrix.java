@@ -1,6 +1,7 @@
 package edu.spbu.matrix;
 
 import java.io.FileReader;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Scanner;
@@ -151,18 +152,19 @@ public class DenseMatrix implements Matrix
           throw new Exception("Матрицы не могут быть умножены: несовпадение размеров");
       double[][] resMatr = new double[this.height][o.width];
       ExecutorService service = Executors.newWorkStealingPool();
-      ArrayList<Future> futureTasks = new ArrayList<>();
+      //ArrayList<Future> futureTasks = new ArrayList<>();
+      Future[] futureTasks = new Future[this.height];
 
       for(int i = 0; i < this.height; i++){
           final int i1 = i;
-          futureTasks.add(service.submit(()->{
+          futureTasks[i1] = service.submit(()->{
               for(int j = 0; j < o.width; j++){
                   resMatr[i1][j] = 0;
                   for(int k = 0; k < this.width; k++){
                       resMatr[i1][j] += this.matr[i1][k] * o.matr[k][j];
                   }
               }
-          }));
+          });
       }
       for(Future task: futureTasks){
           task.get();
@@ -171,10 +173,53 @@ public class DenseMatrix implements Matrix
       return new DenseMatrix(resMatr);
   }
 
+  private SparseMatrix dmul(SparseMatrix o) throws Exception{
+      if(this.width != o.height)
+          throw new Exception("Матрицы не могут быть умножены: несовпадение размеров");
+      ExecutorService service = Executors.newWorkStealingPool();
+      Future[] futureTasks = new Future[this.height];
+      DenseMatrix[] submatrices = new DenseMatrix[this.height];
+      SparseMatrix[] resSubmatrices = new SparseMatrix[this.height];
+      //for(int i = 0; i < this.height; i++) submatrices[i] = new DenseMatrix(1, this.width).denseToSparse();
+      //получение каждой строчки и ее умножение на вторую матрицу
+      for(int i = 0; i < this.height; i++){
+          final int i1 = i;
+          futureTasks[i1] = service.submit(()->{
+              double[][] newMatr = new double[1][this.width];
+              newMatr[0] = this.matr[i1];
+              submatrices[i1] = new DenseMatrix(newMatr);
+              try {
+                  resSubmatrices[i1] = submatrices[i1].mul(o);
+              } catch (Exception e) {
+                  e.printStackTrace();
+              }
+          });
+      }
+      for(Future task: futureTasks){
+          task.get();
+      }
+      service.shutdown();
+
+      //соединение матрицы воедино
+      ArrayList<Double> res_nZV = new ArrayList<>();
+      ArrayList<Integer> res_cI = new ArrayList<>();
+      ArrayList<Integer> res_rI = new ArrayList<>(this.height + 1);
+      res_rI.add(0);
+      for(int i = 0; i < this.height; i++){
+          res_nZV.addAll(resSubmatrices[i].notZeroValues);
+          res_cI.addAll(resSubmatrices[i].colsIndex);
+          res_rI.add(res_nZV.size());
+      }
+      return new SparseMatrix(this.height, o.width, res_nZV, res_cI, res_rI);
+  }
+
   @Override public Matrix dmul(Matrix o) throws Exception
   {
       if(o instanceof DenseMatrix){
           return this.dmul((DenseMatrix) o);
+      }
+      if(o instanceof SparseMatrix){
+          return this.dmul((SparseMatrix) o);
       }
       return null;
   }
@@ -211,6 +256,7 @@ public class DenseMatrix implements Matrix
               result = result.concat(Double.toString(this.matr[i][j]));
               result = result.concat(" ");
           }
+          result = result.substring(0, result.length() - 1);
           result = result.concat("\n");
       }
       return result;
@@ -221,5 +267,21 @@ public class DenseMatrix implements Matrix
       result *= 29;
       result += this.height;
       return result;
+  }
+
+  public static void main(String[] args) throws Exception{
+      long startTime = System.nanoTime();
+      DenseMatrix m1 = new DenseMatrix("C:\\Users\\Евгений\\IdeaProjects\\java-template\\sm1.txt");
+      DenseMatrix m2 = new DenseMatrix("C:\\Users\\Евгений\\IdeaProjects\\java-template\\sm2.txt");
+      PrintWriter out = new PrintWriter("C:\\Users\\Евгений\\IdeaProjects\\java-template\\sm1xsm2.txt");
+      out.print((m1.mul(m2)).toString());
+      out.close();
+      long executionTime = System.nanoTime() - startTime;
+      System.out.println("Execution time: " + executionTime);
+      /*SparseMatrix m = new SparseMatrix("C:\\Users\\Евгений\\IdeaProjects\\java-template\\src\\test\\java\\edu\\spbu\\matrix\\m4.txt");
+      System.out.print(m);
+      PrintWriter out = new PrintWriter("C:\\Users\\Евгений\\IdeaProjects\\java-template\\src\\test\\java\\edu\\spbu\\matrix\\m4.txt");
+      out.print(m.toString());
+      out.close();*/
   }
 }
